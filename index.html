@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Jasmine Flower</title>
+<style>
+body {
+    margin: 0;
+    background: #111;
+    color: #fff;
+    font-family: Arial, sans-serif;
+    overflow: hidden;
+}
+
+#stage {
+    height: calc(100vh - 64px);
+    position: relative;
+}
+
+#stage::before,
+#stage::after{
+    content:'';
+    position:absolute;
+    top:0;
+    bottom:0;
+    pointer-events:none;
+    z-index:100;
+}
+
+#stage::before{
+    left:0;
+    width:50vw;
+    background:linear-gradient(
+        to right,
+        #111 0%,
+        rgba(17,17,17,0.85) 40%,
+        rgba(17,17,17,0) 100%
+    );
+}
+
+#stage::after{
+    right:0;
+    width:30vw;
+    opacity: 0.8;
+    background:linear-gradient(
+        to left,
+        #111 0%,
+        rgba(17,17,17,0.85) 40%,
+        rgba(17,17,17,0) 100%
+    );
+}
+
+.string {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: #666;
+}
+
+#playhead {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: #ffd400;
+    box-shadow: 0 0 20px rgba(255,212,0,.5);
+}
+
+.note {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f2e08a;
+    color: #111;
+    font-weight: 800;
+    font-size: 65px;
+    height: 95px;
+    border-radius: 50px;
+    justify-content: flex-start;
+    padding-left: 25px;
+    box-sizing: border-box;
+    border: 6px solid #111;
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+}
+
+#controls {
+    height: 64px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    padding: 0 10px;
+
+    background: #1b1b1b;
+}
+
+button {
+    width: 60px;
+    height: 50px;
+    background: #484848;
+    color: #eee;
+    border-radius: 15px;
+    border: none;
+    cursor:pointer;
+}
+
+#play {
+    font-size: 20px;
+}
+
+#speed {
+    font-size: 35px;
+}
+
+#seek {
+    flex: 1;
+    cursor:pointer;
+}
+</style>
+</head>
+<body>
+<div id="stage"><div id="playhead"></div></div>
+<div id="controls"><button id="play">▶</button><input id="seek" type="range" min="0" max="1000" value="0"><button id="speed">🐇</button></div>
+<script>
+const CONFIG={mp3File:"jasmine.mp3",bpm:60,leadInSeconds:1.55,loop:true};
+
+const SONG=[
+  {
+    "measure": 1,
+    "events": [
+      {"n":[[1,0],[3,5]],"b":1},
+      {"n":[[1,0]],"b":0.5},
+      {"n":[[1,3]],"b":0.5},
+      {"n":[[1,5],[4,0]],"b":0.5},
+      {"n":[[1,8]],"b":0.5},
+      {"n":[[1,8]],"b":0.5},
+      {"n":[[1,5]],"b":0.5}
+    ]
+  },
+  {
+    "measure": 2,
+    "events": [
+      {"n":[[1,3],[2,5]],"b":1},
+      {"n":[[1,3]],"b":0.5},
+      {"n":[[1,5]],"b":0.5},
+      {"n":[[1,3],[4,0]],"b":2.05}
+    ]
+  },
+  {
+    "measure": 3,
+    "events": [
+      {"n":[[1,0],[3,5]],"b":1},
+      {"n":[[1,0]],"b":0.5},
+      {"n":[[1,3]],"b":0.5},
+      {"n":[[1,5],[4,0]],"b":0.5},
+      {"n":[[1,8]],"b":0.5},
+      {"n":[[1,8]],"b":0.5},
+      {"n":[[1,5]],"b":0.5}
+    ]
+  },
+  {
+    "measure": 4,
+    "events": [
+      {"n":[[1,3],[2,5]],"b":1},
+      {"n":[[1,3]],"b":0.5},
+      {"n":[[1,5]],"b":0.5},
+      {"n":[[1,3],[4,0]],"b":2}
+    ]
+  },
+  {
+    "measure": 5,
+    "events": [
+      {"n":[[1,3],[2,1]],"b":1},
+      {"n":[[1,3]],"b":1},
+      {"n":[[1,3],[2,0]],"b":1},
+      {"n":[[1,0]],"b":0.5},
+      {"n":[[1,3]],"b":0.5}
+    ]
+  },
+  {
+    "measure": 6,
+    "events": [
+      {"n":[[1,5],[2,6]],"b":0.9},
+      {"n":[[1,5]],"b":0.5},
+      {"n":[[1,8]],"b":0.5},
+      {"n":[[1,0],[2,8]],"b":2.2}
+    ]
+  },
+  {
+    "measure": 7,
+    "events": [
+      {"n":[[1,0],[2,1]],"b":1},
+      {"n":[[4,0]],"b":0.5},
+      {"n":[[1,0]],"b":0.5},
+      {"n":[[1,3],[2,5]],"b":1},
+      {"n":[[1,0]],"b":0.5},
+      {"n":[[4,0]],"b":0.5}
+    ]
+  },
+  {
+    "measure": 8,
+    "events": [
+      {"n":[[2,1],[3,2]],"b":1},
+      {"n":[[2,1]],"b":0.5},
+      {"n":[[4,0]],"b":0.5},
+      {"n":[[2,1],[3,0]],"b":2.1}
+    ]
+  },
+  {
+    "measure": 9,
+    "events": [
+      {"n":[[1,0],[2,1]],"b":0.5},
+      {"n":[[4,0]],"b":0.5},
+      {"n":[[2,1]],"b":0.5},
+      {"n":[[1,0]],"b":0.5},
+      {"n":[[3,2],[4,0]],"b":1.5},
+      {"n":[[1,0]],"b":0.5}
+    ]
+  },
+  {
+    "measure": 10,
+    "events": [
+      {"n":[[1,3],[2,5]],"b":1},
+      {"n":[[1,8],[2,10]],"b":0.5},
+      {"n":[[2,10]],"b":0.5},
+      {"n":[[2,8],[4,0]],"b":2.2}
+    ]
+  },
+  {
+    "measure": 11,
+    "events": [
+      {"n":[[3,0],[4,0]],"b":1},
+      {"n":[[1,0]],"b":0.5},
+      {"n":[[1,3]],"b":0.5},
+      {"n":[[4,0]],"b":0.5},
+      {"n":[[1,0]],"b":0.5},
+      {"n":[[2,1]],"b":0.5},
+      {"n":[[3,2]],"b":0.5}
+    ]
+  },
+  {
+    "measure": 12,
+    "events": [
+      {"n":[[3,0]],"b":1.8},
+      {"n":[[1,3],[4,0]],"b":2.1}
+    ]
+  },
+  {
+    "measure": 13,
+    "events": [
+      {"n":[[3,2],[4,3]],"b":1},
+      {"n":[[3,2]],"b":0.5},
+      {"n":[[2,1]],"b":0.5},
+      {"n":[[3,0],[4,0]],"b":1.5},
+      {"n":[[1,0]],"b":0.5}
+    ]
+  },
+  {
+    "measure": 14,
+    "events": [
+      {"n":[[2,1],[3,2]],"b":0.5},
+      {"n":[[4,0]],"b":0.5},
+      {"n":[[2,1]],"b":0.5},
+      {"n":[[3,2]],"b":0.5},
+      {"n":[[3,0],[4,0]],"b":2}
+    ]
+  },
+  {
+    "measure": 15,
+    "events": [
+      {"n":[[3,2],[4,3]],"b":0.8},
+      {"n":[[3,2]],"b":0.5},
+      {"n":[[2,1]],"b":0.5},
+      {"n":[[3,0],[4,0]],"b":1.5},
+      {"n":[[1,0]],"b":0.5}
+    ]
+  },
+  {
+    "measure": 16,
+    "events": [
+      {"n":[[2,1],[3,2]],"b":0.5},
+      {"n":[[4,0]],"b":0.5},
+      {"n":[[2,1]],"b":0.5},
+      {"n":[[3,2]],"b":0.5},
+      {"n":[[3,0],[4,0]],"b":2}
+    ]
+  }
+];
+
+const audio=new Audio(CONFIG.mp3File); audio.loop=CONFIG.loop;
+const stage=document.getElementById('stage');
+const seek=document.getElementById('seek');
+const btn=document.getElementById('play');
+const speedBtn=document.getElementById('speed');
+
+let speedMode=0;
+const SPEEDS=[
+ {icon:'🐇',rate:1.0},
+ {icon:'🐢',rate:0.75},
+ {icon:'🐌',rate:0.5}
+];
+
+let wakeLock = null;
+
+async function requestWakeLock() {
+    if (!('wakeLock' in navigator)) return;
+
+    try {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', () => {
+            wakeLock = null;
+        });
+    } catch (err) {
+        console.log('Wake Lock failed:', err);
+    }
+}
+
+async function releaseWakeLock() {
+    if (!wakeLock) return;
+
+    try {
+        await wakeLock.release();
+    } catch (err) {
+        console.log(err);
+    }
+
+    wakeLock = null;
+}
+
+async function toggleFullscreen() {
+
+    try {
+
+        if (!document.fullscreenElement) {
+            await document.documentElement.requestFullscreen();
+        } else {
+            await document.exitFullscreen();
+        }
+
+    } catch(err) {
+        console.log(err);
+    }
+}
+
+document.addEventListener('visibilitychange', () => {
+    if(document.visibilityState === 'visible' && !audio.paused && !wakeLock){
+        requestWakeLock();
+    }
+});
+
+function build(){
+ const h=stage.clientHeight;
+ const center=h/2;
+ const spacing=100;
+ const ys=[
+   center-spacing*1.5,
+   center-spacing*0.5,
+   center+spacing*0.5,
+   center+spacing*1.5
+ ];
+ ys.forEach(y=>{let s=document.createElement('div');s.className='string';s.style.top=y+'px';stage.appendChild(s);});
+ const beatDur=60/CONFIG.bpm;
+ let beat=0, notes=[];
+ SONG.forEach(m=>m.events.forEach(e=>{
+   const t=CONFIG.leadInSeconds+beat*beatDur;
+   e.n.forEach(nn=>{
+      let d=document.createElement('div');
+      const BEAT_WIDTH = 200;
+
+      d.className = 'note';
+      d.dataset.duration = e.b;
+
+      if (e.b === 0.5) {
+        d.style.width = (BEAT_WIDTH * 0.5) + 'px';
+        d.style.aspectRatio = '1';
+      } else {
+        d.style.width = (BEAT_WIDTH * e.b) + 'px';
+      }
+      d.textContent=nn[1];
+      d.dataset.time=t;
+      d.dataset.beat=beat;
+      d.style.left = '0px';
+      stage.appendChild(d);
+
+      const noteHeight = d.getBoundingClientRect().height;
+
+      d.style.top =
+        (ys[nn[0]-1] - noteHeight / 2) + 'px';
+
+      //notes.push(d); 
+      stage.appendChild(d);
+      notes.push(d);
+   });
+   beat+=e.b;
+ }));
+ function draw(){
+   const BEAT_WIDTH = 180;
+   const currentBeat=(audio.currentTime-CONFIG.leadInSeconds)/beatDur;
+
+   notes.forEach(d=>{
+      const beatX=((+d.dataset.beat)-currentBeat)*BEAT_WIDTH;
+      const x=window.innerWidth/2 + beatX;
+      d.style.transform=`translate3d(${x}px,0,0)`;
+   });
+
+   seek.value=audio.duration?audio.currentTime/audio.duration*1000:0;
+   requestAnimationFrame(draw);
+ }
+ draw();
+}
+build();
+
+stage.addEventListener('click',()=>{
+  btn.click();
+});
+
+btn.onclick=async ()=>{
+ if(audio.paused){
+   await audio.play();
+   btn.textContent='❚❚';
+   requestWakeLock();
+ }else{
+   audio.pause();
+   btn.textContent='▶';
+   releaseWakeLock();
+ }
+};
+speedBtn.onclick=()=>{
+  speedMode=(speedMode+1)%3;
+  const s=SPEEDS[speedMode];
+  speedBtn.textContent=s.icon;
+  audio.playbackRate=s.rate;
+};
+
+seek.oninput=e=>{if(audio.duration)audio.currentTime=(e.target.value/1000)*audio.duration};
+document.addEventListener('keydown',e=>{
+ if(e.code==='Space'){e.preventDefault();btn.click()}
+ if(e.code==='ArrowLeft')audio.currentTime=Math.max(0,audio.currentTime-5);
+ if(e.code==='ArrowRight')audio.currentTime=Math.min(audio.duration||9999,audio.currentTime+5);
+ if(e.code==='ArrowUp'){e.preventDefault();speedBtn.click();}
+ if(e.code==='ArrowDown'){e.preventDefault();speedBtn.click();}
+ if(e.code==='KeyR'){audio.currentTime=0;audio.play();btn.textContent='❚❚';requestWakeLock();}
+ if(e.code==='KeyF'){e.preventDefault(); toggleFullscreen();}
+});
+seek.addEventListener('mouseup', () => seek.blur());
+seek.addEventListener('touchend', () => seek.blur());
+audio.addEventListener('error', () => {
+    alert('Nepodařilo se načíst soubor: ' + CONFIG.mp3File);
+});
+</script>
+</body></html>
